@@ -40,6 +40,31 @@ def parse_args():
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--api-key", type=str, default=None)
 
+    # MLX backend options
+    parser.add_argument(
+        "--backend",
+        type=str,
+        choices=["torch", "mlx"],
+        default="torch",
+        help=(
+            "Inference backend to use. "
+            "'torch' uses the original PyTorch stack (LLaMA + DAC). "
+            "'mlx' uses mlx_audio (Apple Silicon only)."
+        ),
+    )
+    parser.add_argument(
+        "--mlx-model-path",
+        type=str,
+        default="mlx-community/fish-audio-s2-pro-bf16",
+        help="HuggingFace repo id or local path for the MLX model.",
+    )
+    parser.add_argument(
+        "--mlx-lang-code",
+        type=str,
+        default="auto",
+        help="BCP-47 language code passed to mlx_audio (e.g. 'ja', 'zh', 'en', 'auto').",
+    )
+
     return parser.parse_args()
 
 
