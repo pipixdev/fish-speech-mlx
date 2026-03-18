@@ -94,6 +94,10 @@ class API(ExceptionHandler):
             llama_checkpoint_path=self.args.llama_checkpoint_path,
             decoder_checkpoint_path=self.args.decoder_checkpoint_path,
             decoder_config_name=self.args.decoder_config_name,
+            # MLX options (ignored when backend == "torch")
+            backend=self.args.backend,
+            mlx_model_path=self.args.mlx_model_path,
+            mlx_lang_code=self.args.mlx_lang_code,
         )
 
         logger.info(f"Startup done, listening server at http://{self.args.listen}")

@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Fish Speech"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = "==3.12.*"
 keywords = ["TTS", "Speech"]
 license = {text = "Fish Audio Research License"}
 classifiers = [
@@ -14,8 +14,6 @@ classifiers = [
 ]
 dependencies = [
     "numpy",
-    "torch==2.8.0",
-    "torchaudio==2.8.0",
     "transformers<=4.57.3",
     "datasets==2.18.0",
     "lightning>=2.1.0",
@@ -37,8 +35,6 @@ dependencies = [
     "einx[torch]==0.2.2",
     "zstandard>=0.22.0",
     "pydub",
-    "pyaudio",
-    "modelscope==1.17.1",
     "opencc-python-reimplemented==0.1.7",
     "silero-vad",
     "ormsgpack",
@@ -50,6 +46,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mlx = [
+    # Pinned to a known-good commit; bump intentionally when updating.
+    "mlx-audio @ git+https://github.com/Blaizzy/mlx-audio.git@8083120b62fac0cb84dba5c7803e57026e2ebd97",
+    "soundfile",
+]
+client = [
+    "pyaudio",
+]
 stable = [
     "torch==2.8.0",
     "torchaudio",
@@ -72,13 +76,18 @@ cu129 = [
 ]
 
 [tool.uv]
+# override-dependencies: force newer versions that are required for Python 3.12
+# compatibility and to resolve conflicts with mlx-audio's transitive deps.
+# Note: "transformers>=5.0.0" here overrides the "transformers<=4.57.3" pin in
+# [project.dependencies] — keep in sync if the base pin changes upstream.
+# Note: protobuf>=6.33.5 supersedes upstream's <6.0.0 cap; required by mlx-audio.
 override-dependencies = [
-    # descript-audiotools (transitive via descript-audio-codec) pins protobuf<3.20,
-    # but fish-speech's generated proto code requires >=3.20; cap at <6 for API stability
-    "protobuf>=3.20.0,<6.0.0",
+    "protobuf>=6.33.5",
+    "transformers>=5.0.0",
 ]
 conflicts = [
   [
+    { extra = "mlx" },
     { extra = "cpu" },
     { extra = "cu126" },
     { extra = "cu128" },
