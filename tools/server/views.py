@@ -58,6 +58,14 @@ _WEBUI_HTML = (
 routes = Routes()
 
 
+def ensure_vqgan_supported(model_manager: ModelManager) -> None:
+    if model_manager.backend == "mlx":
+        raise HTTPException(
+            HTTPStatus.BAD_REQUEST,
+            content="VQGAN endpoints are not available with the MLX backend.",
+        )
+
+
 @routes.http("/ui")
 class WebUI(HttpView):
     @classmethod
@@ -91,6 +99,7 @@ async def vqgan_encode(req: Annotated[ServeVQGANEncodeRequest, Body(exclusive=Tr
     try:
         # Get the model from the app
         model_manager: ModelManager = request.app.state.model_manager
+        ensure_vqgan_supported(model_manager)
         decoder_model = model_manager.decoder_model
 
         # Encode the audio
@@ -105,6 +114,8 @@ async def vqgan_encode(req: Annotated[ServeVQGANEncodeRequest, Body(exclusive=Tr
             ServeVQGANEncodeResponse(tokens=[i.tolist() for i in tokens]),
             option=ormsgpack.OPT_SERIALIZE_PYDANTIC,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in VQGAN encode: {e}", exc_info=True)
         raise HTTPException(
@@ -120,6 +131,7 @@ async def vqgan_decode(req: Annotated[ServeVQGANDecodeRequest, Body(exclusive=Tr
     try:
         # Get the model from the app
         model_manager: ModelManager = request.app.state.model_manager
+        ensure_vqgan_supported(model_manager)
         decoder_model = model_manager.decoder_model
 
         # Decode the audio
@@ -136,6 +148,8 @@ async def vqgan_decode(req: Annotated[ServeVQGANDecodeRequest, Body(exclusive=Tr
             ServeVQGANDecodeResponse(audios=audios),
             option=ormsgpack.OPT_SERIALIZE_PYDANTIC,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in VQGAN decode: {e}", exc_info=True)
         raise HTTPException(

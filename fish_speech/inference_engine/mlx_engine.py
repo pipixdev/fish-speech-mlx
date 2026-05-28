@@ -37,9 +37,12 @@ mlx_audio API used
 
 from __future__ import annotations
 
+import gc
 import os
+import shutil
 import tempfile
 from pathlib import Path
+from threading import Lock
 from typing import Generator
 
 import numpy as np
@@ -142,6 +145,7 @@ class MLXTTSInferenceEngine(ReferenceLoader):
         # Per-instance temp directory; created lazily on first use so that
         # merely importing the module does not touch the filesystem.
         self._tmp_dir: Path | None = None
+        self._inference_lock = Lock()
 
     # ------------------------------------------------------------------
     # Public interface – mirrors TTSInferenceEngine.inference()
@@ -153,6 +157,40 @@ class MLXTTSInferenceEngine(ReferenceLoader):
             self._tmp_dir = Path(tempfile.mkdtemp(prefix="fish_mlx_"))
         return self._tmp_dir
 
+    @staticmethod
+    def _clear_runtime_cache() -> None:
+        """Release Python and MLX allocator caches after a request."""
+        gc.collect()
+
+        try:
+            import mlx.core as mx  # type: ignore[import]
+        except Exception as exc:
+            logger.debug(f"[MLX] Skipping cache clear; mlx.core unavailable: {exc}")
+            return
+
+        clear_cache = getattr(mx, "clear_cache", None)
+        if callable(clear_cache):
+            try:
+                clear_cache()
+            except Exception as exc:
+                logger.warning(f"[MLX] mx.clear_cache() failed: {exc}")
+
+        metal = getattr(mx, "metal", None)
+        clear_metal_cache = getattr(metal, "clear_cache", None)
+        if callable(clear_metal_cache):
+            try:
+                clear_metal_cache()
+            except Exception as exc:
+                logger.warning(f"[MLX] mx.metal.clear_cache() failed: {exc}")
+
+    def cleanup(self) -> None:
+        """Clean per-engine temporary files and release MLX runtime caches."""
+        with self._inference_lock:
+            if self._tmp_dir is not None and self._tmp_dir.exists():
+                shutil.rmtree(self._tmp_dir, ignore_errors=True)
+            self._tmp_dir = None
+            self._clear_runtime_cache()
+
     def inference(
         self, req: ServeTTSRequest
     ) -> Generator[InferenceResult, None, None]:
@@ -161,25 +199,38 @@ class MLXTTSInferenceEngine(ReferenceLoader):
         with the same ``code`` values ("header", "segment", "final", "error")
         as the original engine so that all downstream consumers work unchanged.
         """
+        if req.streaming:
+            from fish_speech.inference_engine.utils import wav_chunk_header
+
+            yield InferenceResult(
+                code="header",
+                audio=(
+                    self.sample_rate,
+                    np.array(wav_chunk_header(sample_rate=self.sample_rate)),
+                ),
+                error=None,
+            )
+
+        with self._inference_lock:
+            result = self._run_inference(req)
+
+        if result.code == "error":
+            yield result
+            return
+
+        if req.streaming:
+            yield InferenceResult(code="segment", audio=result.audio, error=None)
+
+        yield result
+
+    def _run_inference(self, req: ServeTTSRequest) -> InferenceResult:
+        """Run one MLX generation while the caller holds ``_inference_lock``."""
         from mlx_audio.tts.generate import generate_audio  # type: ignore[import]
 
         tmp_ref_path: str | None = None
         try:
             # ---- resolve reference audio --------------------------------
             ref_audio_path, ref_text, tmp_ref_path = self._resolve_reference(req)
-
-            # ---- streaming header (WAV only) ----------------------------
-            if req.streaming:
-                from fish_speech.inference_engine.utils import wav_chunk_header
-
-                yield InferenceResult(
-                    code="header",
-                    audio=(
-                        self.sample_rate,
-                        np.array(wav_chunk_header(sample_rate=self.sample_rate)),
-                    ),
-                    error=None,
-                )
 
             # ---- synthesise --------------------------------------------
             with tempfile.TemporaryDirectory(dir=self._ensure_tmp_dir()) as tmp_out:
@@ -214,8 +265,7 @@ class MLXTTSInferenceEngine(ReferenceLoader):
 
         except Exception as exc:
             logger.error(f"[MLX] Inference error: {exc}", exc_info=True)
-            yield InferenceResult(code="error", audio=None, error=exc)
-            return
+            return InferenceResult(code="error", audio=None, error=exc)
         finally:
             # Clean up any temp reference file written for this request.
             if tmp_ref_path is not None:
@@ -223,8 +273,9 @@ class MLXTTSInferenceEngine(ReferenceLoader):
                     os.unlink(tmp_ref_path)
                 except OSError:
                     pass
+            self._clear_runtime_cache()
 
-        yield InferenceResult(
+        return InferenceResult(
             code="final",
             audio=(self.sample_rate, audio),
             error=None,

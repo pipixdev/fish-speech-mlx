@@ -83,6 +83,7 @@ class API(ExceptionHandler):
 
         # Associate the app with the model manager
         self.app.on_startup(self.initialize_app)
+        self.app.on_shutdown(self.shutdown_app)
 
     async def initialize_app(self, app: Kui):
         # Make the ModelManager available to the views
@@ -101,6 +102,14 @@ class API(ExceptionHandler):
         )
 
         logger.info(f"Startup done, listening server at http://{self.args.listen}")
+
+    async def shutdown_app(self, app: Kui):
+        model_manager = getattr(app.state, "model_manager", None)
+        engine = getattr(model_manager, "tts_inference_engine", None)
+        cleanup = getattr(engine, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
+            logger.info("Inference engine cleaned up.")
 
 
 def create_app():
@@ -130,6 +139,11 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
     args = parse_args()
+    if args.backend == "mlx" and args.workers != 1:
+        logger.warning(
+            "MLX backend is safest with --workers 1; each worker loads an "
+            "independent model copy and Metal runtime."
+        )
     os.environ[ENV_ARGS_KEY] = json.dumps(vars(args))
 
     # IPv6 address format is [xxxx:xxxx::xxxx]:port
