@@ -14,9 +14,12 @@ import wave
 from pathlib import Path
 from urllib import error, request
 
+from fish_speech.inference_engine.mlx_defaults import (
+    DEFAULT_MLX_MODEL_PATH,
+    DEFAULT_MLX_STT_MODEL_PATH,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MODEL_PATH = "mlx-community/fish-audio-s2-pro-bf16"
 
 
 def _find_free_port() -> int:
@@ -99,7 +102,10 @@ class MLXAPIServerIntegrationTest(unittest.TestCase):
         env.setdefault("PYTHONUNBUFFERED", "1")
         env.setdefault("MPLCONFIGDIR", str(temp_path / "matplotlib"))
 
-        model_path = os.environ.get("FISH_MLX_TEST_MODEL", DEFAULT_MODEL_PATH)
+        model_path = os.environ.get("FISH_MLX_TEST_MODEL", DEFAULT_MLX_MODEL_PATH)
+        stt_model_path = os.environ.get(
+            "FISH_MLX_TEST_STT_MODEL", DEFAULT_MLX_STT_MODEL_PATH
+        )
         command = [
             sys.executable,
             "tools/api_server.py",
@@ -111,6 +117,8 @@ class MLXAPIServerIntegrationTest(unittest.TestCase):
             f"127.0.0.1:{port}",
             "--mlx-model-path",
             model_path,
+            "--mlx-stt-model-path",
+            stt_model_path,
             "--max-text-length",
             "300",
         ]

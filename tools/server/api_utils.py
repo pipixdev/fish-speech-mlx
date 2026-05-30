@@ -14,6 +14,10 @@ from loguru import logger
 from pydantic import BaseModel
 
 from fish_speech.inference_engine import TTSInferenceEngine
+from fish_speech.inference_engine.mlx_defaults import (
+    DEFAULT_MLX_MODEL_PATH,
+    DEFAULT_MLX_STT_MODEL_PATH,
+)
 from fish_speech.utils.schema import ServeTTSRequest
 from tools.server.inference import inference_wrapper as inference
 
@@ -55,8 +59,14 @@ def parse_args():
     parser.add_argument(
         "--mlx-model-path",
         type=str,
-        default="mlx-community/fish-audio-s2-pro-bf16",
-        help="HuggingFace repo id or local path for the MLX model.",
+        default=DEFAULT_MLX_MODEL_PATH,
+        help="HuggingFace repo id, models root, or local path for the MLX TTS model.",
+    )
+    parser.add_argument(
+        "--mlx-stt-model-path",
+        type=str,
+        default=DEFAULT_MLX_STT_MODEL_PATH,
+        help="HuggingFace repo id, models root, or local path for the MLX STT model.",
     )
     parser.add_argument(
         "--mlx-lang-code",

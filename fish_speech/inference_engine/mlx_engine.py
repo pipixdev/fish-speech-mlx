@@ -38,6 +38,7 @@ mlx_audio API used
 from __future__ import annotations
 
 import gc
+import json
 import os
 import shutil
 import tempfile
@@ -51,6 +52,13 @@ from loguru import logger
 
 from fish_speech.inference_engine.reference_loader import ReferenceLoader
 from fish_speech.inference_engine.utils import InferenceResult
+from fish_speech.inference_engine.mlx_defaults import (
+    DEFAULT_MLX_MODEL_PATH,
+    DEFAULT_MLX_STT_MODEL_PATH,
+    LOCAL_FISH_BF16_DIR_NAME,
+    LOCAL_WHISPER_FP16_DIR_NAME,
+    default_mlx_models_dir,
+)
 from fish_speech.utils.schema import ServeTTSRequest
 
 # ---------------------------------------------------------------------------
@@ -74,8 +82,113 @@ def _check_mlx_audio() -> bool:
     return _MLX_AUDIO_AVAILABLE
 
 
-# Hard-coded default – overridden via ``MLXTTSInferenceEngine(model_path=…)``
-DEFAULT_MLX_MODEL_PATH = "mlx-community/fish-audio-s2-pro-bf16"
+# Hard-coded defaults – overridden via ``MLXTTSInferenceEngine(...)``.
+#
+# The first two values stay as HF repo ids for compatibility with older
+# commands.  ``resolve_mlx_model_path`` maps them to the local flat model
+# directories under ``FISH_MLX_MODELS_DIR`` when those directories exist.
+_LOCAL_MODEL_DIR_NAMES = {
+    "tts": LOCAL_FISH_BF16_DIR_NAME,
+    "stt": LOCAL_WHISPER_FP16_DIR_NAME,
+}
+_MODEL_REPO_ALIASES = {
+    "tts": {
+        DEFAULT_MLX_MODEL_PATH,
+        "fish-audio-s2-pro-bf16",
+        LOCAL_FISH_BF16_DIR_NAME,
+    },
+    "stt": {
+        DEFAULT_MLX_STT_MODEL_PATH,
+        "whisper-large-v3-turbo-asr-fp16",
+        LOCAL_WHISPER_FP16_DIR_NAME,
+    },
+}
+
+
+def _read_json(path: Path) -> dict:
+    with path.open(encoding="utf-8") as file:
+        return json.load(file)
+
+
+def _is_local_fish_bf16_model(path: Path) -> bool:
+    config_path = path / "config.json"
+    return (
+        config_path.exists()
+        and (path / "codec.safetensors").exists()
+        and (path / "model.safetensors.index.json").exists()
+        and _read_json(config_path).get("model_type") == "fish_qwen3_omni"
+    )
+
+
+def _is_local_whisper_fp16_model(path: Path) -> bool:
+    config_path = path / "config.json"
+    if not config_path.exists() or not (path / "model.safetensors.index.json").exists():
+        return False
+
+    config = _read_json(config_path)
+    return (
+        config.get("model_type") == "whisper"
+        and config.get("torch_dtype") == "float16"
+        and (path / "preprocessor_config.json").exists()
+    )
+
+
+def _is_expected_local_model(path: Path, model_kind: str) -> bool:
+    if model_kind == "tts":
+        return _is_local_fish_bf16_model(path)
+    if model_kind == "stt":
+        return _is_local_whisper_fp16_model(path)
+    raise ValueError(f"Unsupported MLX model kind: {model_kind}")
+
+
+def _candidate_from_models_root(models_root: Path, model_kind: str) -> Path:
+    return models_root / _LOCAL_MODEL_DIR_NAMES[model_kind]
+
+
+def resolve_mlx_model_path(
+    model_path: str | Path,
+    model_kind: str = "tts",
+    models_root: Path | None = None,
+) -> str:
+    """
+    Resolve supported MLX model aliases to the local flat model directories.
+
+    Supported local layout:
+    ``/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-bf16-audio-s2-pro-bf16``
+    and
+    ``/Users/pipix/Documents/Projects/models/whisper-large-v3-turbo-asr-fp16``.
+    """
+    if model_kind not in _LOCAL_MODEL_DIR_NAMES:
+        raise ValueError(f"Unsupported MLX model kind: {model_kind}")
+
+    models_root = models_root or default_mlx_models_dir()
+    raw_path = Path(model_path).expanduser()
+    raw_text = str(model_path)
+
+    if raw_path.exists():
+        if _is_expected_local_model(raw_path, model_kind):
+            return str(raw_path)
+
+        candidate = _candidate_from_models_root(raw_path, model_kind)
+        if _is_expected_local_model(candidate, model_kind):
+            logger.info(
+                f"[MLX] Resolved {model_kind} model root {raw_path!s} "
+                f"to {candidate!s}."
+            )
+            return str(candidate)
+
+        return raw_text
+
+    if raw_text in _MODEL_REPO_ALIASES[model_kind]:
+        candidate = _candidate_from_models_root(models_root, model_kind)
+        if _is_expected_local_model(candidate, model_kind):
+            logger.info(
+                f"[MLX] Using local {model_kind} model at {candidate!s} "
+                f"for {raw_text!r}."
+            )
+            return str(candidate)
+
+    return raw_text
 
 
 class MLXTTSInferenceEngine(ReferenceLoader):
@@ -88,12 +201,19 @@ class MLXTTSInferenceEngine(ReferenceLoader):
     model_path:
         HuggingFace repo id or local path understood by
         ``mlx_audio.tts.utils.load_model``.
+        The default repo id is resolved to the local bf16 model under
+        ``FISH_MLX_MODELS_DIR`` when available.
     sample_rate:
         Sample rate reported to callers.  mlx_audio produces 44 100 Hz by
         default for the fish-audio models.
     lang_code:
         BCP-47 language code forwarded to ``generate_audio`` (e.g. ``"ja"``,
         ``"zh"``, ``"en"``).  ``"auto"`` lets the model detect the language.
+    stt_model_path:
+        Local path or repo id used by ``mlx_audio`` to transcribe reference
+        audio when a request omits ``ref_text``.  The default repo id is
+        resolved to the local Whisper fp16 model under ``FISH_MLX_MODELS_DIR``
+        when available.
     """
 
     # MLX engine does not use a PyTorch decoder_model, but we expose
@@ -120,6 +240,7 @@ class MLXTTSInferenceEngine(ReferenceLoader):
         model_path: str = DEFAULT_MLX_MODEL_PATH,
         sample_rate: int = 44100,
         lang_code: str = "auto",
+        stt_model_path: str | None = DEFAULT_MLX_STT_MODEL_PATH,
     ) -> None:
         super().__init__()
 
@@ -131,8 +252,15 @@ class MLXTTSInferenceEngine(ReferenceLoader):
 
         from mlx_audio.tts.utils import load_model  # type: ignore[import]
 
-        logger.info(f"[MLX] Loading model from {model_path!r} …")
-        self._mlx_model = load_model(model_path)
+        resolved_model_path = resolve_mlx_model_path(model_path, "tts")
+        self._stt_model_path = (
+            resolve_mlx_model_path(stt_model_path, "stt")
+            if stt_model_path is not None
+            else None
+        )
+
+        logger.info(f"[MLX] Loading model from {resolved_model_path!r} …")
+        self._mlx_model = load_model(resolved_model_path)
         logger.info("[MLX] Model loaded.")
 
         self.sample_rate = sample_rate
@@ -240,6 +368,7 @@ class MLXTTSInferenceEngine(ReferenceLoader):
                     ref_audio=ref_audio_path,
                     ref_text=ref_text,
                     lang_code=self.lang_code if self.lang_code != "auto" else None,
+                    stt_model=self._stt_model_path,
                     file_prefix="out",
                     output_path=tmp_out,
                     audio_format="wav",

@@ -1,5 +1,9 @@
 from loguru import logger
 
+from fish_speech.inference_engine.mlx_defaults import (
+    DEFAULT_MLX_MODEL_PATH,
+    DEFAULT_MLX_STT_MODEL_PATH,
+)
 from fish_speech.utils.schema import ServeTTSRequest
 from tools.server.inference import inference_wrapper as inference
 
@@ -16,7 +20,8 @@ class ModelManager:
         decoder_config_name: str,
         # MLX backend options (ignored when backend == "torch")
         backend: str = "torch",
-        mlx_model_path: str = "mlx-community/fish-audio-s2-pro-bf16",
+        mlx_model_path: str = DEFAULT_MLX_MODEL_PATH,
+        mlx_stt_model_path: str = DEFAULT_MLX_STT_MODEL_PATH,
         mlx_lang_code: str = "auto",
     ) -> None:
 
@@ -33,6 +38,7 @@ class ModelManager:
             self.tts_inference_engine = MLXTTSInferenceEngine(
                 model_path=mlx_model_path,
                 lang_code=mlx_lang_code,
+                stt_model_path=mlx_stt_model_path,
             )
             # Expose decoder_model shim so views.py can read .sample_rate
             self.decoder_model = self.tts_inference_engine.decoder_model

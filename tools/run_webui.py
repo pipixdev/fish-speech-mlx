@@ -7,6 +7,10 @@ from loguru import logger
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
+from fish_speech.inference_engine.mlx_defaults import (
+    DEFAULT_MLX_MODEL_PATH,
+    DEFAULT_MLX_STT_MODEL_PATH,
+)
 from tools.webui import build_app
 from tools.webui.inference import get_inference_wrapper
 
@@ -48,8 +52,14 @@ def parse_args():
     parser.add_argument(
         "--mlx-model-path",
         type=str,
-        default="mlx-community/fish-audio-s2-pro-bf16",
-        help="HuggingFace repo id or local path for the MLX model.",
+        default=DEFAULT_MLX_MODEL_PATH,
+        help="HuggingFace repo id, models root, or local path for the MLX TTS model.",
+    )
+    parser.add_argument(
+        "--mlx-stt-model-path",
+        type=str,
+        default=DEFAULT_MLX_STT_MODEL_PATH,
+        help="HuggingFace repo id, models root, or local path for the MLX STT model.",
     )
     parser.add_argument(
         "--mlx-lang-code",
@@ -73,6 +83,7 @@ if __name__ == "__main__":
 
         inference_engine = MLXTTSInferenceEngine(
             model_path=args.mlx_model_path,
+            stt_model_path=args.mlx_stt_model_path,
             lang_code=args.mlx_lang_code,
         )
         logger.info("[MLX] Engine ready, launching the web UI…")

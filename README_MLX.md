@@ -17,7 +17,7 @@ uv sync --extra mlx
 ```bash
 uv run python tools/run_webui.py \
   --backend mlx \
-  --mlx-model-path mlx-community/fish-audio-s2-pro-bf16
+  --mlx-model-path /Users/pipix/Documents/Projects/models
 ```
 
 Open your browser at http://127.0.0.1:7860
@@ -27,10 +27,12 @@ Open your browser at http://127.0.0.1:7860
 ```bash
 uv run python tools/api_server.py \
   --backend mlx \
-  --mlx-model-path mlx-community/fish-audio-s2-pro-bf16
+  --listen 0.0.0.0:8080 \
+  --mlx-model-path /Users/pipix/Documents/Projects/models
 ```
 
-API available at http://127.0.0.1:8080
+API available locally at http://127.0.0.1:8080 and on your LAN at
+`http://<this-machine-lan-ip>:8080`.
 
 For long-running API service, keep the default `--workers 1`. The MLX backend
 uses one shared model instance per worker, serializes generation inside each
@@ -66,14 +68,16 @@ What the test covers:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FISH_MLX_TEST_MODEL` | `mlx-community/fish-audio-s2-pro-bf16` | HuggingFace repo id or local path used by the test server |
+| `FISH_MLX_MODELS_DIR` | `/Users/pipix/Documents/Projects/models` | Local flat model root containing the bf16 TTS and Whisper fp16 ASR directories |
+| `FISH_MLX_TEST_MODEL` | `mlx-community/fish-audio-s2-pro-bf16` | HuggingFace repo id, model root, or local bf16 TTS path used by the test server |
+| `FISH_MLX_TEST_STT_MODEL` | `mlx-community/whisper-large-v3-turbo-asr-fp16` | HuggingFace repo id, model root, or local Whisper fp16 ASR path used when reference text is omitted |
 | `FISH_MLX_TEST_STARTUP_TIMEOUT` | `600` | Seconds to wait for server startup and model loading |
 | `FISH_MLX_TEST_TTS_TIMEOUT` | `300` | Seconds to wait for the real TTS request |
 
 Example using a local model path:
 
 ```bash
-FISH_MLX_TEST_MODEL=/path/to/mlx-model \
+FISH_MLX_TEST_MODEL=/Users/pipix/Documents/Projects/models \
   uv run python -m unittest tests.integration.test_mlx_api_server
 ```
 
@@ -84,5 +88,12 @@ temporary API server log in the failure message.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--mlx-model-path` | [`mlx-community/fish-audio-s2-pro-bf16`](https://huggingface.co/mlx-community/fish-audio-s2-pro-bf16) | HuggingFace repo id or local path |
+| `--mlx-model-path` | [`mlx-community/fish-audio-s2-pro-bf16`](https://huggingface.co/mlx-community/fish-audio-s2-pro-bf16) | HuggingFace repo id, model root, or local bf16 TTS path |
+| `--mlx-stt-model-path` | `mlx-community/whisper-large-v3-turbo-asr-fp16` | HuggingFace repo id, model root, or local Whisper fp16 ASR path |
 | `--mlx-lang-code` | `auto` | Language code, e.g. `ja` / `zh` / `en`; `auto` for automatic detection |
+
+When the default repo ids are used, the backend first looks for these local
+directories under `FISH_MLX_MODELS_DIR`:
+
+- `fish-audio-s2-pro-bf16-audio-s2-pro-bf16`
+- `whisper-large-v3-turbo-asr-fp16`

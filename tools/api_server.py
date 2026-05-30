@@ -98,6 +98,7 @@ class API(ExceptionHandler):
             # MLX options (ignored when backend == "torch")
             backend=self.args.backend,
             mlx_model_path=self.args.mlx_model_path,
+            mlx_stt_model_path=self.args.mlx_stt_model_path,
             mlx_lang_code=self.args.mlx_lang_code,
         )
 
