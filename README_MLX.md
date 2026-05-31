@@ -97,3 +97,35 @@ directories under `FISH_MLX_MODELS_DIR`:
 
 - `fish-audio-s2-pro-bf16-audio-s2-pro-bf16`
 - `whisper-large-v3-turbo-asr-fp16`
+
+## MLX API Parameter Behavior
+
+The MLX API mode accepts the normal `ServeTTSRequest` payload, but only the
+subset that `mlx_audio` supports is forwarded into the MLX generator.
+
+Parameters that currently take effect in MLX API mode:
+
+- `text`
+- `references` and `reference_id`
+- `max_new_tokens`
+- `top_p`
+- `repetition_penalty`
+- `temperature`
+- `streaming`
+- `format` for the final HTTP response encoding
+
+Parameters that are still accepted for compatibility but are currently no-ops
+in MLX API mode:
+
+- `seed`
+- `normalize`
+- `latency`
+- `use_memory_cache`
+- `chunk_length`
+
+Notes:
+
+- The MLX engine keeps its internal generation format as WAV and the API server
+  re-encodes the final response into the requested output format.
+- `streaming=true` still uses the existing Fish Speech response wrapper. The
+  current MLX path does not yet expose true progressive chunk generation.

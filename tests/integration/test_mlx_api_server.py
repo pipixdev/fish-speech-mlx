@@ -208,6 +208,9 @@ class MLXAPIServerIntegrationTest(unittest.TestCase):
                 }
             ],
             "max_new_tokens": 128,
+            "top_p": 0.55,
+            "repetition_penalty": 1.25,
+            "temperature": 0.65,
         }
 
         try:

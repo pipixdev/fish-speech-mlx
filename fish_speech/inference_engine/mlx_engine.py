@@ -319,6 +319,33 @@ class MLXTTSInferenceEngine(ReferenceLoader):
             self._tmp_dir = None
             self._clear_runtime_cache()
 
+    def _build_generate_audio_kwargs(
+        self,
+        req: ServeTTSRequest,
+        ref_audio_path: str | None,
+        ref_text: str,
+        output_path: str,
+    ) -> dict[str, object]:
+        """Map API request fields onto the supported mlx_audio kwargs."""
+        return {
+            "model": self._mlx_model,
+            "text": req.text,
+            "max_tokens": req.max_new_tokens,
+            "temperature": req.temperature,
+            "top_p": req.top_p,
+            "repetition_penalty": req.repetition_penalty,
+            "ref_audio": ref_audio_path,
+            "ref_text": ref_text,
+            "lang_code": self.lang_code if self.lang_code != "auto" else None,
+            "stt_model": self._stt_model_path,
+            "file_prefix": "out",
+            "output_path": output_path,
+            # Keep MLX generation internal to WAV. views.py performs the final
+            # response encoding after the engine reads the float audio back.
+            "audio_format": "wav",
+            "verbose": False,
+        }
+
     def inference(
         self, req: ServeTTSRequest
     ) -> Generator[InferenceResult, None, None]:
@@ -363,16 +390,12 @@ class MLXTTSInferenceEngine(ReferenceLoader):
             # ---- synthesise --------------------------------------------
             with tempfile.TemporaryDirectory(dir=self._ensure_tmp_dir()) as tmp_out:
                 generate_audio(
-                    model=self._mlx_model,
-                    text=req.text,
-                    ref_audio=ref_audio_path,
-                    ref_text=ref_text,
-                    lang_code=self.lang_code if self.lang_code != "auto" else None,
-                    stt_model=self._stt_model_path,
-                    file_prefix="out",
-                    output_path=tmp_out,
-                    audio_format="wav",
-                    verbose=False,
+                    **self._build_generate_audio_kwargs(
+                        req=req,
+                        ref_audio_path=ref_audio_path,
+                        ref_text=ref_text,
+                        output_path=tmp_out,
+                    )
                 )
 
                 # mlx_audio writes ``<output_path>/out.wav`` (or with index)
