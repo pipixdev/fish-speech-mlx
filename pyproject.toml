@@ -47,8 +47,8 @@ dependencies = [
 
 [project.optional-dependencies]
 mlx = [
-    # Pinned to a known-good commit; bump intentionally when updating.
-    "mlx-audio @ git+https://github.com/Blaizzy/mlx-audio.git@8083120b62fac0cb84dba5c7803e57026e2ebd97",
+  # 0.4.2 supports the local Fish Audio bf16 and 8bit models; 0.4.3 regresses bf16 output quality.
+  "mlx-audio==0.4.2",
     "soundfile",
 ]
 client = [

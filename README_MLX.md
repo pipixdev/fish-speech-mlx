@@ -10,14 +10,28 @@ An inference backend powered by `mlx_audio`
 uv sync --extra mlx
 ```
 
+The verified project pin is `mlx-audio==0.4.2`. On this machine it supports
+both local Fish model directories:
+
+- `/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit`
+- `/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-bf16-audio-s2-pro-bf16`
+
+Do not bump to `mlx-audio==0.4.3` for this repo without revalidation. It loads
+the models, but the bf16 model regresses to obviously bad/noisy speech output.
+
 ## Start the Service
+
+Quick-start launchers on this machine:
+
+- `run_api_server_mlx.command` prompts you to choose the 8bit or bf16 model at startup
+- Set `FISH_MLX_MODEL_PATH` to skip the prompt and force an exact model directory
 
 ### WebUI (Gradio, recommended)
 
 ```bash
 uv run python tools/run_webui.py \
   --backend mlx \
-  --mlx-model-path /Users/pipix/Documents/Projects/models
+  --mlx-model-path /Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit
 ```
 
 Open your browser at http://127.0.0.1:7860
@@ -28,11 +42,15 @@ Open your browser at http://127.0.0.1:7860
 uv run python tools/api_server.py \
   --backend mlx \
   --listen 0.0.0.0:8080 \
-  --mlx-model-path /Users/pipix/Documents/Projects/models
+  --mlx-model-path /Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit
 ```
 
 API available locally at http://127.0.0.1:8080 and on your LAN at
 `http://<this-machine-lan-ip>:8080`.
+
+When both the bf16 and 8bit Fish models exist under `FISH_MLX_MODELS_DIR`, pass
+the exact Fish model directory you want. The bare models root still resolves the
+default bf16 shortcut directory.
 
 For long-running API service, keep the default `--workers 1`. The MLX backend
 uses one shared model instance per worker, serializes generation inside each
@@ -69,7 +87,7 @@ What the test covers:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FISH_MLX_MODELS_DIR` | `/Users/pipix/Documents/Projects/models` | Local flat model root containing the bf16 TTS and Whisper fp16 ASR directories |
-| `FISH_MLX_TEST_MODEL` | `mlx-community/fish-audio-s2-pro-bf16` | HuggingFace repo id, model root, or local bf16 TTS path used by the test server |
+| `FISH_MLX_TEST_MODEL` | `mlx-community/fish-audio-s2-pro-bf16` | HuggingFace repo id, model root, or explicit local Fish TTS path used by the test server |
 | `FISH_MLX_TEST_STT_MODEL` | `mlx-community/whisper-large-v3-turbo-asr-fp16` | HuggingFace repo id, model root, or local Whisper fp16 ASR path used when reference text is omitted |
 | `FISH_MLX_TEST_STARTUP_TIMEOUT` | `600` | Seconds to wait for server startup and model loading |
 | `FISH_MLX_TEST_TTS_TIMEOUT` | `300` | Seconds to wait for the real TTS request |
@@ -77,7 +95,7 @@ What the test covers:
 Example using a local model path:
 
 ```bash
-FISH_MLX_TEST_MODEL=/Users/pipix/Documents/Projects/models \
+FISH_MLX_TEST_MODEL=/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit \
   uv run python -m unittest tests.integration.test_mlx_api_server
 ```
 
@@ -88,7 +106,7 @@ temporary API server log in the failure message.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--mlx-model-path` | [`mlx-community/fish-audio-s2-pro-bf16`](https://huggingface.co/mlx-community/fish-audio-s2-pro-bf16) | HuggingFace repo id, model root, or local bf16 TTS path |
+| `--mlx-model-path` | [`mlx-community/fish-audio-s2-pro-bf16`](https://huggingface.co/mlx-community/fish-audio-s2-pro-bf16) | HuggingFace repo id, model root, or explicit local Fish TTS path |
 | `--mlx-stt-model-path` | `mlx-community/whisper-large-v3-turbo-asr-fp16` | HuggingFace repo id, model root, or local Whisper fp16 ASR path |
 | `--mlx-lang-code` | `auto` | Language code, e.g. `ja` / `zh` / `en`; `auto` for automatic detection |
 
@@ -96,6 +114,7 @@ When the default repo ids are used, the backend first looks for these local
 directories under `FISH_MLX_MODELS_DIR`:
 
 - `fish-audio-s2-pro-bf16-audio-s2-pro-bf16`
+- `fish-audio-s2-pro-8bit` (pass this exact directory when you want the quantized model)
 - `whisper-large-v3-turbo-asr-fp16`
 
 ## MLX API Parameter Behavior

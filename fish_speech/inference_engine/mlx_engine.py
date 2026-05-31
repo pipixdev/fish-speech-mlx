@@ -85,8 +85,10 @@ def _check_mlx_audio() -> bool:
 # Hard-coded defaults – overridden via ``MLXTTSInferenceEngine(...)``.
 #
 # The first two values stay as HF repo ids for compatibility with older
-# commands.  ``resolve_mlx_model_path`` maps them to the local flat model
-# directories under ``FISH_MLX_MODELS_DIR`` when those directories exist.
+# commands.  ``resolve_mlx_model_path`` maps them to the default local flat
+# model directories under ``FISH_MLX_MODELS_DIR`` when those directories exist.
+# Explicit local Fish model directories, including quantized variants, are
+# accepted directly to avoid ambiguity when multiple local Fish variants coexist.
 _LOCAL_MODEL_DIR_NAMES = {
     "tts": LOCAL_FISH_BF16_DIR_NAME,
     "stt": LOCAL_WHISPER_FP16_DIR_NAME,
@@ -110,7 +112,7 @@ def _read_json(path: Path) -> dict:
         return json.load(file)
 
 
-def _is_local_fish_bf16_model(path: Path) -> bool:
+def _is_local_fish_tts_model(path: Path) -> bool:
     config_path = path / "config.json"
     return (
         config_path.exists()
@@ -135,7 +137,7 @@ def _is_local_whisper_fp16_model(path: Path) -> bool:
 
 def _is_expected_local_model(path: Path, model_kind: str) -> bool:
     if model_kind == "tts":
-        return _is_local_fish_bf16_model(path)
+        return _is_local_fish_tts_model(path)
     if model_kind == "stt":
         return _is_local_whisper_fp16_model(path)
     raise ValueError(f"Unsupported MLX model kind: {model_kind}")
@@ -155,6 +157,8 @@ def resolve_mlx_model_path(
 
     Supported local layout:
     ``/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-bf16-audio-s2-pro-bf16``
+    or an explicit local Fish model directory such as
+    ``/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit``
     and
     ``/Users/pipix/Documents/Projects/models/whisper-large-v3-turbo-asr-fp16``.
     """

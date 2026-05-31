@@ -30,6 +30,21 @@ def _create_fish_bf16_model(root: Path) -> Path:
     return model_dir
 
 
+def _create_fish_8bit_model(root: Path) -> Path:
+    model_dir = root / "fish-audio-s2-pro-8bit"
+    _write_json(
+        model_dir / "config.json",
+        {
+            "model_type": "fish_qwen3_omni",
+            "quantization": {"bits": 8, "group_size": 64, "mode": "affine"},
+        },
+    )
+    _touch(model_dir / "codec.safetensors")
+    _touch(model_dir / "model.safetensors")
+    _touch(model_dir / "model.safetensors.index.json")
+    return model_dir
+
+
 def _create_whisper_fp16_model(root: Path) -> Path:
     model_dir = root / LOCAL_WHISPER_FP16_DIR_NAME
     _write_json(
@@ -77,6 +92,13 @@ class MLXModelPathResolutionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             tts_dir = _create_fish_bf16_model(root)
+
+            self.assertEqual(resolve_mlx_model_path(tts_dir, "tts"), str(tts_dir))
+
+    def test_keeps_actual_quantized_model_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            tts_dir = _create_fish_8bit_model(root)
 
             self.assertEqual(resolve_mlx_model_path(tts_dir, "tts"), str(tts_dir))
 
