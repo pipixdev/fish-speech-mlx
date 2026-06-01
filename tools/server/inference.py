@@ -1,15 +1,15 @@
 from http import HTTPStatus
+from typing import Any
 
 import numpy as np
 from kui.asgi import HTTPException
 
-from fish_speech.inference_engine import TTSInferenceEngine
 from fish_speech.utils.schema import ServeTTSRequest
 
-AMPLITUDE = 32768  # Needs an explaination
+AMPLITUDE = 32768
 
 
-def inference_wrapper(req: ServeTTSRequest, engine: TTSInferenceEngine):
+def inference_wrapper(req: ServeTTSRequest, engine: Any):
     """
     Wrapper for the inference function.
     Used in the API server.

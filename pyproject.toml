@@ -4,136 +4,46 @@ version = "2.0.0"
 authors = [
     {name = "Fish Audio", email = "oss@fish.audio"},
 ]
-description = "Fish Speech"
+description = "Fish Speech API server for Apple Silicon"
 readme = "README.md"
 requires-python = "==3.12.*"
-keywords = ["TTS", "Speech"]
+keywords = ["TTS", "Speech", "MLX"]
 license = {text = "Fish Audio Research License"}
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "numpy",
-    "transformers<=4.57.3",
-    "datasets==2.18.0",
-    "lightning>=2.1.0",
-    "hydra-core>=1.3.2",
-    "tensorboard>=2.14.1",
-    "natsort>=8.4.0",
-    "einops>=0.7.0",
-    "librosa>=0.10.1",
-    "rich>=13.5.3",
-    "gradio>5.0.0",
-    "wandb>=0.19.0",
-    "grpcio>=1.58.0",
     "kui>=1.6.0",
-    "uvicorn>=0.30.0",
     "loguru>=0.6.0",
-    "loralib>=0.1.2",
-    "pyrootutils>=1.0.4",
-    "resampy>=0.4.3",
-    "einx[torch]==0.2.2",
-    "zstandard>=0.22.0",
-    "pydub",
-    "opencc-python-reimplemented==0.1.7",
-    "silero-vad",
+    "numpy",
     "ormsgpack",
-    "tiktoken>=0.8.0",
     "pydantic==2.9.2",
-    "cachetools",
-    "descript-audio-codec",
-    "safetensors"
+    "pyrootutils>=1.0.4",
+    "soundfile",
+    "uvicorn>=0.30.0",
 ]
 
 [project.optional-dependencies]
 mlx = [
-  # 0.4.2 supports the local Fish Audio bf16 and 8bit models; 0.4.3 regresses bf16 output quality.
-  "mlx-audio==0.4.2",
-    "soundfile",
-]
-client = [
-    "pyaudio",
-]
-stable = [
-    "torch==2.8.0",
-    "torchaudio",
-]
-cpu = [
-  "torch==2.8.0",
-  "torchaudio",
-]
-cu126 = [
-  "torch==2.8.0",
-  "torchaudio",
-]
-cu128 = [
-  "torch==2.8.0",
-  "torchaudio",
-]
-cu129 = [
-  "torch==2.8.0",
-  "torchaudio",
+    # 0.4.2 supports the local Fish Audio bf16 and 8bit models; 0.4.3 regresses bf16 output quality.
+    "mlx-audio==0.4.2",
 ]
 
 [tool.uv]
-# override-dependencies: force newer versions that are required for Python 3.12
-# compatibility and to resolve conflicts with mlx-audio's transitive deps.
-# Note: "transformers>=5.0.0" here overrides the "transformers<=4.57.3" pin in
-# [project.dependencies] — keep in sync if the base pin changes upstream.
-# Note: protobuf>=6.33.5 supersedes upstream's <6.0.0 cap; required by mlx-audio.
+# mlx-audio pulls these libraries transitively. These overrides match the
+# validated local environment for Python 3.12 and the two local MLX model dirs.
 override-dependencies = [
     "protobuf>=6.33.5",
     "transformers>=5.0.0",
 ]
-conflicts = [
-  [
-    { extra = "mlx" },
-    { extra = "cpu" },
-    { extra = "cu126" },
-    { extra = "cu128" },
-    { extra = "cu129" },
-  ],
-]
-
-[tool.uv.sources]
-torch = [
-  { index = "pytorch-cpu", extra = "cpu" },
-  { index = "pytorch-cu126", extra = "cu126" },
-  { index = "pytorch-cu128", extra = "cu128" },
-  { index = "pytorch-cu129", extra = "cu129" },
-]
-torchaudio = [
-  { index = "pytorch-cpu", extra = "cpu" },
-  { index = "pytorch-cu126", extra = "cu126" },
-  { index = "pytorch-cu128", extra = "cu128" },
-  { index = "pytorch-cu129", extra = "cu129" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-cu129"
-url = "https://download.pytorch.org/whl/cu129"
-explicit = true
 
 [build-system]
 requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["fish_speech", "tools"]
+[tool.setuptools.packages.find]
+include = ["fish_speech*", "tools*"]
+namespaces = true
 
 [tool.setuptools_scm]

@@ -20,7 +20,7 @@ from kui.cors import CORSConfig
 from kui.openapi.specification import Info
 from kui.security import bearer_auth
 from loguru import logger
-from typing_extensions import Annotated
+from typing import Annotated
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
@@ -78,7 +78,6 @@ class API(ExceptionHandler):
 
         # Add the state variables
         self.app.state.lock = Lock()
-        self.app.state.device = self.args.device
         self.app.state.max_text_length = self.args.max_text_length
 
         # Associate the app with the model manager
@@ -88,14 +87,6 @@ class API(ExceptionHandler):
     async def initialize_app(self, app: Kui):
         # Make the ModelManager available to the views
         app.state.model_manager = ModelManager(
-            mode=self.args.mode,
-            device=self.args.device,
-            half=self.args.half,
-            compile=self.args.compile,
-            llama_checkpoint_path=self.args.llama_checkpoint_path,
-            decoder_checkpoint_path=self.args.decoder_checkpoint_path,
-            decoder_config_name=self.args.decoder_config_name,
-            # MLX options (ignored when backend == "torch")
             backend=self.args.backend,
             mlx_model_path=self.args.mlx_model_path,
             mlx_stt_model_path=self.args.mlx_stt_model_path,
@@ -140,7 +131,7 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
     args = parse_args()
-    if args.backend == "mlx" and args.workers != 1:
+    if args.workers != 1:
         logger.warning(
             "MLX backend is safest with --workers 1; each worker loads an "
             "independent model copy and Metal runtime."

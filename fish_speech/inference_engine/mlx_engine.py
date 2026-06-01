@@ -1,16 +1,7 @@
-"""
-MLX backend for TTSInferenceEngine.
+"""MLX inference engine used by the API server.
 
-This module provides an alternative inference engine that uses mlx_audio
-instead of the PyTorch-based stack (LLaMA + DAC).  The public interface
-(the ``inference`` generator) is identical to the original
-``TTSInferenceEngine`` so that the rest of the server / WebUI code needs
-no further changes.
-
-Usage
------
-Instantiate ``MLXTTSInferenceEngine`` wherever you would normally build a
-``TTSInferenceEngine``, then pass it to the same server / WebUI code.
+This module delegates speech synthesis to ``mlx_audio`` and keeps a tiny
+generator interface for the HTTP response wrapper.
 
 The engine wraps the reference-audio management helpers from
 ``ReferenceLoader`` so that the ``/v1/references/*`` API endpoints continue
@@ -197,8 +188,7 @@ def resolve_mlx_model_path(
 
 class MLXTTSInferenceEngine(ReferenceLoader):
     """
-    Drop-in replacement for ``TTSInferenceEngine`` that delegates all
-    speech synthesis to ``mlx_audio``.
+    Inference engine that delegates speech synthesis to ``mlx_audio``.
 
     Parameters
     ----------
@@ -233,7 +223,7 @@ class MLXTTSInferenceEngine(ReferenceLoader):
 
         @property
         def device(self):
-            # Return a CPU-like object so existing guard code does not crash.
+        # Return a CPU-like object for compatibility with response wrappers.
             import types
 
             d = types.SimpleNamespace(type="cpu")
@@ -280,7 +270,7 @@ class MLXTTSInferenceEngine(ReferenceLoader):
         self._inference_lock = Lock()
 
     # ------------------------------------------------------------------
-    # Public interface – mirrors TTSInferenceEngine.inference()
+    # Public interface used by tools.server.inference
     # ------------------------------------------------------------------
 
     def _ensure_tmp_dir(self) -> Path:
