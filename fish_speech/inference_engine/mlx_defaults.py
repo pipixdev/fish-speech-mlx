@@ -8,6 +8,4 @@ LOCAL_WHISPER_FP16_DIR_NAME = "whisper-large-v3-turbo-asr-fp16"
 
 
 def default_mlx_models_dir() -> Path:
-    return Path(
-        os.environ.get("FISH_MLX_MODELS_DIR", "/Users/pipix/Documents/Projects/models")
-    )
+    return Path(os.environ.get("FISH_MLX_MODELS_DIR", "models"))

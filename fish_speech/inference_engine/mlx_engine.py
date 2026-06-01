@@ -147,11 +147,11 @@ def resolve_mlx_model_path(
     Resolve supported MLX model aliases to the local flat model directories.
 
     Supported local layout:
-    ``/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-bf16-audio-s2-pro-bf16``
+    ``<models-root>/fish-audio-s2-pro-bf16-audio-s2-pro-bf16``
     or an explicit local Fish model directory such as
-    ``/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit``
+    ``<models-root>/fish-audio-s2-pro-8bit``
     and
-    ``/Users/pipix/Documents/Projects/models/whisper-large-v3-turbo-asr-fp16``.
+    ``<models-root>/whisper-large-v3-turbo-asr-fp16``.
     """
     if model_kind not in _LOCAL_MODEL_DIR_NAMES:
         raise ValueError(f"Unsupported MLX model kind: {model_kind}")

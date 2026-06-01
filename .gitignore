@@ -60,6 +60,10 @@ venv.bak/
 .pdm-python
 /fish_speech.egg-info
 
+# Local Launchers
+# ---------------
+/run_api_server.command
+
 # Data and Model Files
 # --------------------
 data/

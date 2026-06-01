@@ -2,14 +2,14 @@
 
 This repository has been trimmed for one use case: running the Fish Speech API
 server with `mlx_audio` on Apple Silicon and calling it from the local Speech
-client at `/Users/pipix/Documents/Projects/Speech`.
+client.
 
 ## Supported Models
 
-The local launcher supports these two Fish MLX model directories:
+The local launcher supports the local 8bit and bf16 Fish MLX model directories
+configured in `run_api_server.command`.
 
-- `/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit`
-- `/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-bf16-audio-s2-pro-bf16`
+That launcher is intentionally local-only and is ignored by Git.
 
 The verified project pin is `mlx-audio==0.4.2`. Do not bump to
 `mlx-audio==0.4.3` without revalidation; it loads the models, but the bf16
@@ -35,8 +35,7 @@ The launcher prompts for the 8bit or bf16 model and starts the server on
 To skip the prompt:
 
 ```bash
-FISH_MLX_MODEL_PATH=/Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit \
-  ./run_api_server.command
+FISH_MLX_MODEL_PATH=/path/to/fish-audio-s2-pro-8bit ./run_api_server.command
 ```
 
 Direct command:
@@ -45,7 +44,7 @@ Direct command:
 uv run python tools/api_server.py \
   --backend mlx \
   --listen 0.0.0.0:8080 \
-  --mlx-model-path /Users/pipix/Documents/Projects/models/fish-audio-s2-pro-8bit
+  --mlx-model-path /path/to/fish-audio-s2-pro-8bit
 ```
 
 API available locally at `http://127.0.0.1:8080` and on your LAN at
@@ -117,7 +116,7 @@ Integration test configuration:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `FISH_MLX_MODELS_DIR` | `/Users/pipix/Documents/Projects/models` | Local flat model root |
+| `FISH_MLX_MODELS_DIR` | `models` | Local flat model root |
 | `FISH_MLX_TEST_MODEL` | `mlx-community/fish-audio-s2-pro-bf16` | TTS model repo id, model root, or explicit local Fish path |
 | `FISH_MLX_TEST_STT_MODEL` | `mlx-community/whisper-large-v3-turbo-asr-fp16` | STT model repo id, model root, or explicit local Whisper path |
 | `FISH_MLX_TEST_STARTUP_TIMEOUT` | `600` | Seconds to wait for server startup |
