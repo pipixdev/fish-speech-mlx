@@ -6,8 +6,17 @@ client.
 
 ## Supported Models
 
-The local launcher supports the local 8bit and bf16 Fish MLX model directories
-configured in `run_api_server.command`.
+The local launcher supports three local MLX model directories configured in
+`run_api_server.command`:
+
+- Fish Audio S2 Pro 8bit
+- Fish Audio S2 Pro bf16
+- Qwen3-TTS 12Hz 1.7B Base bf16
+
+Qwen3-TTS Base supports reference-audio voice cloning through the same
+`references` and `reference_id` request fields. The server reads each model's
+native sample rate automatically (24 kHz for Qwen3-TTS and 44.1 kHz for the
+Fish models).
 
 That launcher is intentionally local-only and is ignored by Git.
 
@@ -29,7 +38,7 @@ Double-click:
 run_api_server.command
 ```
 
-The launcher prompts for the 8bit or bf16 model and starts the server on
+The launcher prompts for one of the three models and starts the server on
 `0.0.0.0:8080`.
 
 To skip the prompt:

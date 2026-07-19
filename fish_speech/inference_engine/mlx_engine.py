@@ -113,6 +113,19 @@ def _is_local_fish_tts_model(path: Path) -> bool:
     )
 
 
+def _is_local_qwen3_tts_model(path: Path) -> bool:
+    config_path = path / "config.json"
+    speech_tokenizer_path = path / "speech_tokenizer"
+    return (
+        config_path.exists()
+        and (path / "model.safetensors").exists()
+        and (path / "model.safetensors.index.json").exists()
+        and (speech_tokenizer_path / "config.json").exists()
+        and (speech_tokenizer_path / "model.safetensors").exists()
+        and _read_json(config_path).get("model_type") == "qwen3_tts"
+    )
+
+
 def _is_local_whisper_fp16_model(path: Path) -> bool:
     config_path = path / "config.json"
     if not config_path.exists() or not (path / "model.safetensors.index.json").exists():
@@ -128,7 +141,7 @@ def _is_local_whisper_fp16_model(path: Path) -> bool:
 
 def _is_expected_local_model(path: Path, model_kind: str) -> bool:
     if model_kind == "tts":
-        return _is_local_fish_tts_model(path)
+        return _is_local_fish_tts_model(path) or _is_local_qwen3_tts_model(path)
     if model_kind == "stt":
         return _is_local_whisper_fp16_model(path)
     raise ValueError(f"Unsupported MLX model kind: {model_kind}")
@@ -150,6 +163,8 @@ def resolve_mlx_model_path(
     ``<models-root>/fish-audio-s2-pro-bf16-audio-s2-pro-bf16``
     or an explicit local Fish model directory such as
     ``<models-root>/fish-audio-s2-pro-8bit``
+    or an explicit Qwen3-TTS model directory such as
+    ``<models-root>/Qwen3-TTS-12Hz-1.7B-Base-bf16``
     and
     ``<models-root>/whisper-large-v3-turbo-asr-fp16``.
     """
@@ -184,6 +199,38 @@ def resolve_mlx_model_path(
             return str(candidate)
 
     return raw_text
+
+
+_QWEN3_LANGUAGE_ALIASES = {
+    "zh": "chinese",
+    "zh-cn": "chinese",
+    "cmn": "chinese",
+    "en": "english",
+    "de": "german",
+    "it": "italian",
+    "pt": "portuguese",
+    "es": "spanish",
+    "ja": "japanese",
+    "ko": "korean",
+    "fr": "french",
+    "ru": "russian",
+}
+
+
+def normalize_mlx_lang_code(model: object, lang_code: str) -> str | None:
+    """Translate the server language option to the selected model's API."""
+    model_type = getattr(model, "model_type", None)
+    if not isinstance(model_type, str):
+        model_type = getattr(getattr(model, "config", None), "model_type", None)
+
+    normalized = lang_code.strip().lower().replace("_", "-")
+    if model_type == "qwen3_tts":
+        if normalized == "auto":
+            return "auto"
+        return _QWEN3_LANGUAGE_ALIASES.get(normalized, normalized)
+
+    # Fish models use None to request automatic language detection.
+    return None if normalized == "auto" else lang_code
 
 
 class MLXTTSInferenceEngine(ReferenceLoader):
@@ -232,7 +279,7 @@ class MLXTTSInferenceEngine(ReferenceLoader):
     def __init__(
         self,
         model_path: str = DEFAULT_MLX_MODEL_PATH,
-        sample_rate: int = 44100,
+        sample_rate: int | None = None,
         lang_code: str = "auto",
         stt_model_path: str | None = DEFAULT_MLX_STT_MODEL_PATH,
     ) -> None:
@@ -257,12 +304,20 @@ class MLXTTSInferenceEngine(ReferenceLoader):
         self._mlx_model = load_model(resolved_model_path)
         logger.info("[MLX] Model loaded.")
 
-        self.sample_rate = sample_rate
+        model_sample_rate = getattr(self._mlx_model, "sample_rate", None)
+        self.sample_rate = int(sample_rate or model_sample_rate or 44100)
         self.lang_code = lang_code
+        self._generation_lang_code = normalize_mlx_lang_code(
+            self._mlx_model, lang_code
+        )
+        logger.info(
+            f"[MLX] Model sample rate: {self.sample_rate} Hz; "
+            f"language: {self._generation_lang_code or 'auto'}"
+        )
 
         # Provide a shim so that code doing ``engine.decoder_model.sample_rate``
         # (e.g. views.py line 138) keeps working without modification.
-        self.decoder_model = self._DecoderModelShim(sample_rate)
+        self.decoder_model = self._DecoderModelShim(self.sample_rate)
 
         # Per-instance temp directory; created lazily on first use so that
         # merely importing the module does not touch the filesystem.
@@ -330,7 +385,7 @@ class MLXTTSInferenceEngine(ReferenceLoader):
             "repetition_penalty": req.repetition_penalty,
             "ref_audio": ref_audio_path,
             "ref_text": ref_text,
-            "lang_code": self.lang_code if self.lang_code != "auto" else None,
+            "lang_code": self._generation_lang_code,
             "stt_model": self._stt_model_path,
             "file_prefix": "out",
             "output_path": output_path,

@@ -10,21 +10,57 @@ from fish_speech.inference_engine.mlx_engine import MLXTTSInferenceEngine
 from fish_speech.utils.schema import ServeTTSRequest
 
 
-def _fake_mlx_audio_modules(generate_audio):
+def _fake_mlx_audio_modules(generate_audio, load_model=None):
+    if load_model is None:
+        load_model = lambda _: object()
+
     mlx_audio_module = types.ModuleType("mlx_audio")
     tts_module = types.ModuleType("mlx_audio.tts")
     generate_module = types.ModuleType("mlx_audio.tts.generate")
+    utils_module = types.ModuleType("mlx_audio.tts.utils")
     generate_module.generate_audio = generate_audio
+    utils_module.load_model = load_model
     tts_module.generate = generate_module
+    tts_module.utils = utils_module
     mlx_audio_module.tts = tts_module
     return {
         "mlx_audio": mlx_audio_module,
         "mlx_audio.tts": tts_module,
         "mlx_audio.tts.generate": generate_module,
+        "mlx_audio.tts.utils": utils_module,
     }
 
 
 class MLXRequestMappingTest(unittest.TestCase):
+    def test_qwen_engine_uses_native_sample_rate_and_auto_language(self) -> None:
+        qwen_model = types.SimpleNamespace(
+            model_type="qwen3_tts",
+            sample_rate=24000,
+        )
+
+        with (
+            patch(
+                "fish_speech.inference_engine.mlx_engine._check_mlx_audio",
+                return_value=True,
+            ),
+            patch.dict(
+                sys.modules,
+                _fake_mlx_audio_modules(
+                    lambda **_: None,
+                    load_model=lambda _: qwen_model,
+                ),
+            ),
+        ):
+            engine = MLXTTSInferenceEngine(
+                model_path="/models/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+                lang_code="auto",
+                stt_model_path=None,
+            )
+
+        self.assertEqual(engine.sample_rate, 24000)
+        self.assertEqual(engine.decoder_model.sample_rate, 24000)
+        self.assertEqual(engine._generation_lang_code, "auto")
+
     def test_run_inference_forwards_supported_sampling_params(self) -> None:
         captured_kwargs: dict[str, object] = {}
 
@@ -42,6 +78,7 @@ class MLXRequestMappingTest(unittest.TestCase):
         engine._mlx_model = object()
         engine._stt_model_path = "/tmp/fake-whisper"
         engine.lang_code = "auto"
+        engine._generation_lang_code = None
         engine.sample_rate = 44100
         engine._clear_runtime_cache = lambda: None
 

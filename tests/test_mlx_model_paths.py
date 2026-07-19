@@ -7,9 +7,13 @@ from fish_speech.inference_engine.mlx_defaults import (
     DEFAULT_MLX_MODEL_PATH,
     DEFAULT_MLX_STT_MODEL_PATH,
     LOCAL_FISH_BF16_DIR_NAME,
+    LOCAL_QWEN3_TTS_BF16_DIR_NAME,
     LOCAL_WHISPER_FP16_DIR_NAME,
 )
-from fish_speech.inference_engine.mlx_engine import resolve_mlx_model_path
+from fish_speech.inference_engine.mlx_engine import (
+    normalize_mlx_lang_code,
+    resolve_mlx_model_path,
+)
 
 
 def _touch(path: Path) -> None:
@@ -42,6 +46,16 @@ def _create_fish_8bit_model(root: Path) -> Path:
     _touch(model_dir / "codec.safetensors")
     _touch(model_dir / "model.safetensors")
     _touch(model_dir / "model.safetensors.index.json")
+    return model_dir
+
+
+def _create_qwen3_tts_model(root: Path) -> Path:
+    model_dir = root / LOCAL_QWEN3_TTS_BF16_DIR_NAME
+    _write_json(model_dir / "config.json", {"model_type": "qwen3_tts"})
+    _touch(model_dir / "model.safetensors")
+    _touch(model_dir / "model.safetensors.index.json")
+    _write_json(model_dir / "speech_tokenizer" / "config.json", {})
+    _touch(model_dir / "speech_tokenizer" / "model.safetensors")
     return model_dir
 
 
@@ -102,11 +116,36 @@ class MLXModelPathResolutionTest(unittest.TestCase):
 
             self.assertEqual(resolve_mlx_model_path(tts_dir, "tts"), str(tts_dir))
 
+    def test_keeps_actual_qwen3_tts_model_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            tts_dir = _create_qwen3_tts_model(root)
+
+            self.assertEqual(resolve_mlx_model_path(tts_dir, "tts"), str(tts_dir))
+
     def test_keeps_unknown_repo_id(self) -> None:
         self.assertEqual(
             resolve_mlx_model_path("mlx-community/other-model", "tts"),
             "mlx-community/other-model",
         )
+
+
+class MLXLanguageMappingTest(unittest.TestCase):
+    def test_qwen_keeps_auto_as_a_string(self) -> None:
+        model = type("QwenModel", (), {"model_type": "qwen3_tts"})()
+
+        self.assertEqual(normalize_mlx_lang_code(model, "auto"), "auto")
+
+    def test_qwen_maps_bcp47_language_codes(self) -> None:
+        model = type("QwenModel", (), {"model_type": "qwen3_tts"})()
+
+        self.assertEqual(normalize_mlx_lang_code(model, "zh-CN"), "chinese")
+        self.assertEqual(normalize_mlx_lang_code(model, "ja"), "japanese")
+
+    def test_fish_keeps_existing_auto_behavior(self) -> None:
+        model = type("FishModel", (), {"model_type": "fish_qwen3_omni"})()
+
+        self.assertIsNone(normalize_mlx_lang_code(model, "auto"))
 
 
 if __name__ == "__main__":

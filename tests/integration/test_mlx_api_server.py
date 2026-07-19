@@ -69,10 +69,13 @@ def _post_json(url: str, payload: dict, timeout: float) -> bytes:
         return response.read()
 
 
-def _assert_wav(test_case: unittest.TestCase, audio: bytes) -> None:
+def _assert_wav(
+    test_case: unittest.TestCase, audio: bytes, expected_sample_rate: int
+) -> None:
     test_case.assertGreater(len(audio), 44)
     test_case.assertEqual(audio[:4], b"RIFF")
     test_case.assertEqual(audio[8:12], b"WAVE")
+    test_case.assertEqual(struct.unpack_from("<I", audio, 24)[0], expected_sample_rate)
 
 
 class MLXAPIServerIntegrationTest(unittest.TestCase):
@@ -225,7 +228,10 @@ class MLXAPIServerIntegrationTest(unittest.TestCase):
         except Exception as exc:
             self.fail(f"TTS request failed: {exc}\n{self._read_log_tail()}")
 
-        _assert_wav(self, audio)
+        expected_sample_rate = int(
+            os.environ.get("FISH_MLX_TEST_SAMPLE_RATE", "44100")
+        )
+        _assert_wav(self, audio, expected_sample_rate)
 
 
 if __name__ == "__main__":
